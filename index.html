@@ -9,6 +9,26 @@
 
 <div class="container">
   <h1>Explain Anything with Illustrations</h1>
+  
+  <!-- API Key Configuration Section -->
+  <div class="api-key-section">
+    <h3>API Configuration</h3>
+    <div class="api-key-container">
+      <input type="password" id="api-key-input" placeholder="Enter your Gemini API key..." />
+      <button id="save-key-button">Save Key</button>
+      <button id="clear-key-button">Clear Key</button>
+    </div>
+    <p class="api-key-status" id="api-key-status">No API key configured</p>
+    <details class="api-help">
+      <summary>How to get a Gemini API key?</summary>
+      <p>1. Go to <a href="https://makersuite.google.com/app/apikey" target="_blank">Google AI Studio</a></p>
+      <p>2. Sign in with your Google account</p>
+      <p>3. Click "Create API Key"</p>
+      <p>4. Copy the key and paste it above</p>
+      <p><strong>Note:</strong> Your API key is stored locally in your browser and never sent to our servers.</p>
+    </details>
+  </div>
+
   <p>Examples:</p>
   <ul id="examples">
     <li>Explain how neural networks work.</li>
@@ -19,7 +39,6 @@
   
   <div class="prompt-container">
     <textarea id="input" placeholder="Enter a topic to explain..."></textarea>
-    <!-- YEH HAI WOH IMPORTANT BUTTON JO MISSING THA -->
     <button id="explain-button">Explain</button>
   </div>
   

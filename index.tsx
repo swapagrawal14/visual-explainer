@@ -6,22 +6,18 @@
 import {GoogleGenAI, Modality} from '@google/genai';
 import {marked} from 'marked';
 
-// --- YEH LINE THEEK KAR DI GAYI HAI ---
-// This is the correct way to get the secret key on Vercel
-const ai = new GoogleGenAI({apiKey: import.meta.env.VITE_GEMINI_API_KEY});
+// Global AI instance - will be initialized when API key is provided
+let ai: GoogleGenAI | null = null;
 
-const chat = ai.chats.create({
-  model: 'gemini-2.0-flash-preview-image-generation',
-  config: {
-    responseModalities: [Modality.TEXT, Modality.IMAGE],
-  },
-  history: [],
-});
-
+// DOM elements
 const userInput = document.querySelector('#input') as HTMLTextAreaElement;
 const slideshow = document.querySelector('#slideshow') as HTMLDivElement;
 const error = document.querySelector('#error') as HTMLDivElement;
 const explainButton = document.querySelector('#explain-button') as HTMLButtonElement;
+const apiKeyInput = document.querySelector('#api-key-input') as HTMLInputElement;
+const saveKeyButton = document.querySelector('#save-key-button') as HTMLButtonElement;
+const clearKeyButton = document.querySelector('#clear-key-button') as HTMLButtonElement;
+const apiKeyStatus = document.querySelector('#api-key-status') as HTMLParagraphElement;
 
 const additionalInstructions = `
 Explain the topic in a series of simple, easy-to-understand points.
@@ -30,6 +26,102 @@ For each point, generate a cute, minimal illustration with black ink on a white 
 No commentary, just begin your explanation.
 Keep going until you're done.`;
 
+// API Key Management
+const API_KEY_STORAGE_KEY = 'gemini_api_key';
+
+function saveApiKey(key: string) {
+  localStorage.setItem(API_KEY_STORAGE_KEY, key);
+  initializeAI(key);
+  updateApiKeyStatus(true);
+  updateButtonStates();
+}
+
+function loadApiKey(): string | null {
+  return localStorage.getItem(API_KEY_STORAGE_KEY);
+}
+
+function clearApiKey() {
+  localStorage.removeItem(API_KEY_STORAGE_KEY);
+  ai = null;
+  apiKeyInput.value = '';
+  updateApiKeyStatus(false);
+  updateButtonStates();
+}
+
+function initializeAI(apiKey: string) {
+  try {
+    ai = new GoogleGenAI({apiKey});
+    return true;
+  } catch (e) {
+    console.error('Failed to initialize AI:', e);
+    return false;
+  }
+}
+
+function updateApiKeyStatus(configured: boolean) {
+  if (configured) {
+    apiKeyStatus.textContent = 'API key configured ✓';
+    apiKeyStatus.className = 'api-key-status configured';
+  } else {
+    apiKeyStatus.textContent = 'No API key configured';
+    apiKeyStatus.className = 'api-key-status not-configured';
+  }
+}
+
+function updateButtonStates() {
+  const hasApiKey = ai !== null;
+  explainButton.disabled = !hasApiKey;
+  
+  // Update examples clickability
+  const examples = document.querySelectorAll('#examples li');
+  examples.forEach((li) => {
+    if (hasApiKey) {
+      li.style.cursor = 'pointer';
+      li.style.opacity = '1';
+    } else {
+      li.style.cursor = 'not-allowed';
+      li.style.opacity = '0.6';
+    }
+  });
+}
+
+// Initialize on page load
+function initializeApp() {
+  const savedKey = loadApiKey();
+  if (savedKey) {
+    initializeAI(savedKey);
+    updateApiKeyStatus(true);
+  } else {
+    updateApiKeyStatus(false);
+  }
+  updateButtonStates();
+}
+
+// Event listeners for API key management
+saveKeyButton.addEventListener('click', () => {
+  const key = apiKeyInput.value.trim();
+  if (key) {
+    if (initializeAI(key)) {
+      saveApiKey(key);
+      apiKeyInput.value = ''; // Clear input for security
+    } else {
+      showError('Invalid API key. Please check your key and try again.');
+    }
+  }
+});
+
+clearKeyButton.addEventListener('click', () => {
+  clearApiKey();
+});
+
+apiKeyInput.addEventListener('keydown', (e: KeyboardEvent) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    saveKeyButton.click();
+  }
+});
+
+// Utility functions
 async function addSlide(text: string, image: HTMLImageElement) {
   const slide = document.createElement('div');
   slide.className = 'slide';
@@ -49,24 +141,39 @@ function parseError(error: string) {
   }
 }
 
+function showError(message: string) {
+  error.innerHTML = message;
+  error.removeAttribute('hidden');
+}
+
+function hideError() {
+  error.innerHTML = '';
+  error.toggleAttribute('hidden', true);
+}
+
+// Main generation function
 async function generate(message: string) {
   if (!message.trim()) return;
+  
+  if (!ai) {
+    showError('Please configure your Gemini API key first.');
+    return;
+  }
 
   userInput.disabled = true;
   explainButton.disabled = true;
   explainButton.textContent = 'Generating...';
 
   const chat = ai.chats.create({
-  model: 'gemini-2.0-flash-preview-image-generation',
-  config: {
-    responseModalities: [Modality.TEXT, Modality.IMAGE],
-  },
-});
+    model: 'gemini-2.0-flash-preview-image-generation',
+    config: {
+      responseModalities: [Modality.TEXT, Modality.IMAGE],
+    },
+  });
 
   slideshow.innerHTML = '';
-  error.innerHTML = '';
+  hideError();
   slideshow.toggleAttribute('hidden', true);
-  error.toggleAttribute('hidden', true);
 
   try {
     const result = await chat.sendMessageStream({
@@ -78,10 +185,10 @@ async function generate(message: string) {
     let img = null;
 
     for await (const chunk of result) {
-  const candidates = chunk?.candidates ?? [];
-  for (const candidate of candidates) {
-    const parts = candidate?.content?.parts ?? [];
-    for (const part of parts) {
+      const candidates = chunk?.candidates ?? [];
+      for (const candidate of candidates) {
+        const parts = candidate?.content?.parts ?? [];
+        for (const part of parts) {
           if (part.text) {
             text += part.text;
           } else if (part.inlineData) {
@@ -107,8 +214,7 @@ async function generate(message: string) {
     }
   } catch (e) {
     const msg = parseError(String(e));
-    error.innerHTML = `Something went wrong: ${msg}`;
-    error.removeAttribute('hidden');
+    showError(`Something went wrong: ${msg}`);
   }
   
   userInput.disabled = false;
@@ -117,6 +223,7 @@ async function generate(message: string) {
   userInput.focus();
 }
 
+// Event listeners for main functionality
 userInput.addEventListener('keydown', async (e: KeyboardEvent) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
@@ -128,11 +235,19 @@ explainButton.addEventListener('click', async () => {
   await generate(userInput.value);
 });
 
+// Example click handlers
 const examples = document.querySelectorAll('#examples li');
 examples.forEach((li) =>
   li.addEventListener('click', async () => {
+    if (!ai) {
+      showError('Please configure your Gemini API key first.');
+      return;
+    }
     const message = li.textContent || '';
     userInput.value = message;
     await generate(message);
   }),
 );
+
+// Initialize the app when the page loads
+initializeApp();
