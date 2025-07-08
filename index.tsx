@@ -72,8 +72,8 @@ function updateButtonStates() {
   const hasApiKey = ai !== null;
   explainButton.disabled = !hasApiKey;
   
-  // Update examples clickability
-  const examples = document.querySelectorAll('#examples li');
+  // Update examples clickability - Fixed type casting
+  const examples = document.querySelectorAll('#examples li') as NodeListOf<HTMLLIElement>;
   examples.forEach((li) => {
     if (hasApiKey) {
       li.style.cursor = 'pointer';
@@ -182,7 +182,7 @@ async function generate(message: string) {
     
     userInput.value = '';
     let text = '';
-    let img = null;
+    let img: HTMLImageElement | null = null;
 
     for await (const chunk of result) {
       const candidates = chunk?.candidates ?? [];
@@ -235,8 +235,8 @@ explainButton.addEventListener('click', async () => {
   await generate(userInput.value);
 });
 
-// Example click handlers
-const examples = document.querySelectorAll('#examples li');
+// Example click handlers - Fixed type casting
+const examples = document.querySelectorAll('#examples li') as NodeListOf<HTMLLIElement>;
 examples.forEach((li) =>
   li.addEventListener('click', async () => {
     if (!ai) {
