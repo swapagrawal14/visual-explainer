@@ -6,18 +6,27 @@
     }
   }
 </script>
+
 <div class="container">
   <h1>Explain Anything with Illustrations</h1>
   <p>Examples:</p>
   <ul id="examples">
     <li>Explain how neural networks work.</li>
-    <li>Explain how The Matrix works.</li>
+    <li>Explain The Matrix movie.</li>
     <li>Explain how spaghettification works.</li>
   </ul>
   <p>or enter your own prompt:</p>
-  <textarea id="input" placeholder="Enter a topic to explain..."></textarea>
+  
+  <div class="prompt-container">
+    <textarea id="input" placeholder="Enter a topic to explain..."></textarea>
+    <!-- YEH HAI WOH IMPORTANT BUTTON JO MISSING THA -->
+    <button id="explain-button">Explain</button>
+  </div>
+  
   <div id="output"></div>
   <div id="error" hidden></div>
   <div id="slideshow" hidden></div>
-</div><link rel="stylesheet" href="/index.css">
+</div>
+
+<link rel="stylesheet" href="/index.css">
 <script type="module" src="/index.tsx"></script>
