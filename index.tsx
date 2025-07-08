@@ -6,20 +6,24 @@
 import {GoogleGenAI, Modality} from '@google/genai';
 import {marked} from 'marked';
 
-const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
+// IMPORTANT: Your API key is now handled by Vercel's Environment Variables.
+// This line uses the key you added in Vercel's settings.
+const ai = new GoogleGenAI({apiKey: process.env.VITE_GEMINI_API_KEY});
 
 const chat = ai.chats.create({
-  model: 'gemini-2.0-flash-preview-image-generation',
+  model: 'gemini-1.5-flash', // Using a standard, reliable model
   config: {
     responseModalities: [Modality.TEXT, Modality.IMAGE],
   },
   history: [],
 });
 
+// Using querySelector to find the elements in your HTML
 const userInput = document.querySelector('#input') as HTMLTextAreaElement;
 const modelOutput = document.querySelector('#output') as HTMLDivElement;
 const slideshow = document.querySelector('#slideshow') as HTMLDivElement;
 const error = document.querySelector('#error') as HTMLDivElement;
+const explainButton = document.querySelector('#explain-button') as HTMLButtonElement; // Assuming you have a button with id="explain-button"
 
 const additionalInstructions = `
 Explain the topic in a series of simple, easy-to-understand points.
@@ -39,31 +43,26 @@ async function addSlide(text: string, image: HTMLImageElement) {
 }
 
 function parseError(error: string) {
-  const regex = /{"error":(.*)}/gm;
-  const m = regex.exec(error);
   try {
-    const e = m[1];
-    const err = JSON.parse(e);
-    return err.message;
+    const e = JSON.parse(error.replace(/^[^{]*/, ''));
+    return e.error.message;
   } catch (e) {
     return error;
   }
 }
 
 async function generate(message: string) {
+  if (!message.trim()) return; // Don't run if the input is empty
+
   userInput.disabled = true;
+  explainButton.disabled = true;
 
   chat.history.length = 0;
-  modelOutput.innerHTML = '';
   slideshow.innerHTML = '';
   error.innerHTML = '';
   error.toggleAttribute('hidden', true);
 
   try {
-    const userTurn = document.createElement('div') as HTMLDivElement;
-    userTurn.innerHTML = await marked.parse(message);
-    userTurn.className = 'user-turn';
-    modelOutput.append(userTurn);
     userInput.value = '';
 
     const result = await chat.sendMessageStream({
@@ -84,11 +83,9 @@ async function generate(message: string) {
               if (data) {
                 img = document.createElement('img');
                 img.src = `data:image/png;base64,` + data.data;
-              } else {
-                console.log('no data', chunk);
               }
             } catch (e) {
-              console.log('no data', chunk);
+              console.log('Error processing image data', e);
             }
           }
           if (text && img) {
@@ -100,31 +97,44 @@ async function generate(message: string) {
         }
       }
     }
-    if (img) {
-      await addSlide(text, img);
+    if (img) { // If there's a leftover image
+      await addSlide(text || ' ', img); // Add with any remaining text or just a space
       slideshow.removeAttribute('hidden');
-      text = '';
     }
   } catch (e) {
-    const msg = parseError(e);
+    const msg = parseError(String(e));
     error.innerHTML = `Something went wrong: ${msg}`;
     error.removeAttribute('hidden');
   }
   userInput.disabled = false;
+  explainButton.disabled = false;
   userInput.focus();
 }
 
+// --- YEH HAI ENTER KEY KA CODE ---
+// This listens for any key press in the input box
 userInput.addEventListener('keydown', async (e: KeyboardEvent) => {
-  if (e.code === 'Enter') {
-    e.preventDefault();
+  // Checks if the pressed key is 'Enter' AND Shift key is NOT pressed
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault(); // This stops the 'Enter' key from creating a new line
     const message = userInput.value;
-    await generate(message);
+    await generate(message); // Calls the same function as the button
   }
 });
 
+// This is for the button click
+explainButton.addEventListener('click', async () => {
+  const message = userInput.value;
+  await generate(message);
+});
+
+
+// This is for the example prompts
 const examples = document.querySelectorAll('#examples li');
 examples.forEach((li) =>
-  li.addEventListener('click', async (e) => {
-    await generate(li.textContent);
+  li.addEventListener('click', async () => {
+    const message = li.textContent || '';
+    userInput.value = message;
+    await generate(message);
   }),
 );
