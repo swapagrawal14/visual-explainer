@@ -11,7 +11,7 @@ import {marked} from 'marked';
 const ai = new GoogleGenAI({apiKey: import.meta.env.VITE_GEMINI_API_KEY});
 
 const chat = ai.chats.create({
-  model: 'gemini-1.5-flash',
+  model: 'gemini-2.0-flash-preview-image-generation',
   config: {
     responseModalities: [Modality.TEXT, Modality.IMAGE],
   },
@@ -56,7 +56,13 @@ async function generate(message: string) {
   explainButton.disabled = true;
   explainButton.textContent = 'Generating...';
 
-  chat.history.length = 0;
+  const chat = ai.chats.create({
+  model: 'gemini-2.0-flash-preview-image-generation',
+  config: {
+    responseModalities: [Modality.TEXT, Modality.IMAGE],
+  },
+});
+
   slideshow.innerHTML = '';
   error.innerHTML = '';
   slideshow.toggleAttribute('hidden', true);
@@ -72,8 +78,10 @@ async function generate(message: string) {
     let img = null;
 
     for await (const chunk of result) {
-      for (const candidate of chunk.candidates) {
-        for (const part of candidate.content.parts ?? []) {
+  const candidates = chunk?.candidates ?? [];
+  for (const candidate of candidates) {
+    const parts = candidate?.content?.parts ?? [];
+    for (const part of parts) {
           if (part.text) {
             text += part.text;
           } else if (part.inlineData) {
